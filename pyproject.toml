@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pollinations_api"
+version = "0.1.0"
+description = "Python client library for Pollinations.AI API"
+authors = [
+    { name = "Justin Kang", email = "scisjustin@gmail.com" }
+]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.6"
+dependencies = [
+    "requests"
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+    # "License :: OSI Approved :: MIT License"  <-- 삭제!
+]
+
+[project.optional-dependencies]
+streaming = [
+    "sseclient-py"
+]
+
+[project.urls]
+Homepage = "https://github.com/mangostin2010/pollinations_api"
