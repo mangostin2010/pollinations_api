@@ -263,19 +263,12 @@ class PollinationsAPI:
         private: bool = False,
         referrer: Optional[str] = None,
         extra_payload: Optional[Dict[str, Any]] = None,
-    ) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
-        """
-        Call the OpenAI compatible POST endpoint.
-    
-        :param model: Model ID (required)
-        :param messages: List of message dicts with roles and content
-        ...  # (rest of docstring omitted for brevity)
-        """
+    ) -> Union[Dict[str, Any], Generator[str, None, None]]:
         url = self.OPENAI_ENDPOINT
         headers = self._build_headers({"Content-Type": "application/json"})
         if stream:
             headers["Accept"] = "text/event-stream"
-    
+
         payload = {
             "model": model,
             "messages": messages,
@@ -291,7 +284,7 @@ class PollinationsAPI:
         if frequency_penalty is not None:
             payload["frequency_penalty"] = frequency_penalty
         if stream:
-            payload["stream"] = True
+            payload["stream"] = True  # <-- Boolean True
         if json_mode is not None:
             payload["jsonMode"] = json_mode
         if response_format:
@@ -306,10 +299,10 @@ class PollinationsAPI:
             payload["referrer"] = referrer
         elif self.referrer:
             payload["referrer"] = self.referrer
-    
+
         if extra_payload:
             payload.update(extra_payload)
-    
+
         try:
             if stream:
                 if sseclient is None:
@@ -319,18 +312,22 @@ class PollinationsAPI:
                 client = sseclient.SSEClient(resp)
                 for event in client.events():
                     if event.data:
-                        if event.data == "[DONE]":
+                        if event.data.strip() == "[DONE]":
                             break
                         try:
                             chunk = json.loads(event.data)
-                            yield chunk
+                            # Extract the streamed text:
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield content
                         except json.JSONDecodeError:
-                            yield event.data
+                            continue  # Ignore non-JSON chunks
             else:
                 resp = self.session.post(url, headers=headers, json=payload, timeout=self.timeout)
                 resp.raise_for_status()
                 return resp.json()
-    
+
         except requests.RequestException as e:
             raise PollinationsAPIError(f"Error in openai_chat_completion: {e}")
 
