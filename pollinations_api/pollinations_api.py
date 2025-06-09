@@ -264,6 +264,12 @@ class PollinationsAPI:
         referrer: Optional[str] = None,
         extra_payload: Optional[Dict[str, Any]] = None,
     ) -> Union[Dict[str, Any], Generator[str, None, None]]:
+        """
+        OpenAI-compatible chat completion.
+        Returns:
+            - dict (non-streaming)
+            - generator of text chunks (streaming)
+        """
         url = self.OPENAI_ENDPOINT
         headers = self._build_headers({"Content-Type": "application/json"})
         if stream:
@@ -284,7 +290,7 @@ class PollinationsAPI:
         if frequency_penalty is not None:
             payload["frequency_penalty"] = frequency_penalty
         if stream:
-            payload["stream"] = True  # <-- Boolean True
+            payload["stream"] = True
         if json_mode is not None:
             payload["jsonMode"] = json_mode
         if response_format:
@@ -299,37 +305,43 @@ class PollinationsAPI:
             payload["referrer"] = referrer
         elif self.referrer:
             payload["referrer"] = self.referrer
-
         if extra_payload:
             payload.update(extra_payload)
 
-        try:
-            if stream:
-                if sseclient is None:
-                    raise PollinationsAPIError("sseclient-py is required for streaming support. Install with `pip install sseclient-py`")
-                resp = self.session.post(url, headers=headers, json=payload, stream=True, timeout=self.timeout)
-                resp.raise_for_status()
-                client = sseclient.SSEClient(resp)
-                for event in client.events():
-                    if event.data:
-                        if event.data.strip() == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(event.data)
-                            # Extract the streamed text:
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
-                            continue  # Ignore non-JSON chunks
-            else:
+        if stream:
+            # Streaming variant: return a generator
+            return self._openai_chat_completion_stream(url, headers, payload)
+        else:
+            # Non-streaming: return dict
+            try:
                 resp = self.session.post(url, headers=headers, json=payload, timeout=self.timeout)
                 resp.raise_for_status()
                 return resp.json()
+            except requests.RequestException as e:
+                raise PollinationsAPIError(f"Error in openai_chat_completion: {e}")
 
+    def _openai_chat_completion_stream(self, url, headers, payload) -> Generator[str, None, None]:
+        try:
+            resp = self.session.post(url, headers=headers, json=payload, stream=True, timeout=self.timeout)
+            resp.raise_for_status()
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                    choices = chunk.get("choices", [])
+                    if choices and "delta" in choices[0]:
+                        content = choices[0]["delta"].get("content")
+                        if content:
+                            yield content
+                    # else: skip empty/non-content chunks
+                except Exception:
+                    continue  # ignore malformed chunks
         except requests.RequestException as e:
-            raise PollinationsAPIError(f"Error in openai_chat_completion: {e}")
+            raise PollinationsAPIError(f"Error in openai_chat_completion (stream): {e}")
 
 
     # ------------------- Vision (Image Input) -------------------

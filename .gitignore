@@ -54,3 +54,6 @@ coverage.xml
 # Mac & system files
 .DS_Store
 Thumbs.db
+
+# Testing
+test/

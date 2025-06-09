@@ -6,23 +6,23 @@ A developer-friendly Python SDK for interacting with the [Pollinations API](http
 
 ## Features
 
-- **Image Generation**: Create images from text prompts with multiple model options.
-- **Text Generation**: Generate or complete text, including OpenAI-compatible chat and streaming.
-- **Vision (Image Analysis)**: Describe or answer questions about images (from URL or local files).
-- **Speech-to-Text**: Transcribe audio files to text.
-- **Text-to-Speech**: Synthesize speech from text, save as MP3.
-- **Model Listing**: List available image, text, and voice models.
-- **Real-time Feeds**: Subscribe to live image/text generation events via SSE.
+- **Image Generation:** Create images from text prompts with multiple model options.
+- **Text Generation:** Generate or complete text, including OpenAI-compatible chat and streaming.
+- **Vision (Image Analysis):** Describe or answer questions about images (from URL or local files).
+- **Speech-to-Text:** Transcribe audio files to text.
+- **Text-to-Speech:** Synthesize speech from text, save as MP3.
+- **Model Listing:** List available image, text, and voice models.
+- **Real-time Feeds:** Subscribe to live image/text generation events via SSE.
 
 ## Installation
-You can install through PIP:
-```bash
-pip install pollinations-api
-```
+
+Install via pip:
 
 ```bash
+pip install pollinations-api
 pip install requests
-pip install sseclient-py    # For streaming (SSE) support
+# For SSE real-time feeds (not needed for streaming chat/text completions):
+pip install sseclient-py
 ```
 
 ## Quick Start
@@ -60,6 +60,8 @@ except PollinationsAPIError as e:
     print(e)
 ```
 
+---
+
 ## Usage Examples
 
 ### 1. Image Generation
@@ -91,7 +93,9 @@ api.generate_image(
         print(chunk, end="", flush=True)
     ```
 
-### 3. OpenAI Chat Completion
+### 3. OpenAI-Compatible Chat Completion
+
+**Non-streaming:**
 
 ```python
 response = api.openai_chat_completion(
@@ -104,16 +108,20 @@ response = api.openai_chat_completion(
 print(response['choices'][0]['message']['content'])
 ```
 
-- **Streaming chat:**
+**Streaming:**
 
-    ```python
-    for chunk in api.openai_chat_completion(
-        model="openai",
-        messages=[...],
-        stream=True
-    ):
-        print(chunk)
-    ```
+```python
+for chunk in api.openai_chat_completion(
+    model="openai",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Summarize the plot of Inception."}
+    ],
+    stream=True
+):
+    print(chunk, end="", flush=True)
+```
+*No `sseclient-py` is needed for OpenAI-style streaming!*
 
 ### 4. Vision (Image Analysis)
 
@@ -165,6 +173,7 @@ print("Text models:", api.list_text_models())
 ### 8. Real-time Feeds (SSE)
 
 - **Image feed:**
+  (Requires `sseclient-py`)
 
     ```python
     for event in api.connect_image_feed():
@@ -172,6 +181,7 @@ print("Text models:", api.list_text_models())
     ```
 
 - **Text feed:**
+  (Requires `sseclient-py`)
 
     ```python
     for event in api.connect_text_feed():
@@ -193,7 +203,7 @@ All API errors are raised as `PollinationsAPIError`. Use try-except blocks to ha
 
 - Python 3.7+
 - `requests`
-- `sseclient-py` (for streaming, feeds)
+- `sseclient-py` (only for real-time GET feeds, not for chat streaming)
 
 ## License
 
@@ -204,4 +214,12 @@ MIT
 ## Notes
 
 - For best results, see official documentation: [https://github.com/pollinations/pollinations/blob/master/APIDOCS.md](https://github.com/pollinations/pollinations/blob/master/APIDOCS.md)
-- Issues and contributions are welcome! 
+- Issues and contributions are welcome!
+
+---
+
+**Special Notes:**
+- For OpenAI-style streaming (chat completions), you do **not** need `sseclient-py`, as the SDK parses streamed events directly.
+- For real-time image/text feeds (`connect_image_feed`, `connect_text_feed`), `sseclient-py` is required.
+
+---
